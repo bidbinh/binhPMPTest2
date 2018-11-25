@@ -1,0 +1,57 @@
+22 Nov 11:26:10
+(L
+const ChatBot = require('dingtalk-robot-sender');
+var dateFormat = require('dateformat');
+const json2csv = require('json2csv');
+var fs = require('file-system');
+const robot = new ChatBot({
+  webhook: 'https://oapi.dingtalk.com/robot/send?access_token=49bb1f058330fa0b7901f9fe6bf840720513aef4814a1a57619834ad55eedb85'
+});
+var current_time = '';
+var last_update = '';
+var async = require('async');
+const pg = require('pg');
+const client = new pg.Client({user:'sang_le',host:'10.117.3.242',database:'lms',password:'G77oDpAW0cMc',port:32005});
+client.connect()
+  //.then(() => console.log('connected'))
+  //.catch(e => console.error('connection error', err.stack))  
+var msg = "";
+var at = {
+    "atMobiles": [
+     
+    ], 
+    "isAtAll": false
+  };
+client.query(`select
+v.name as vehicle,u.name as rider_name,left(u.name,3) as hub_name
+from public.user u
+left join public.user_group_user pu on pu.user_id=u.id
+left join public.user_group up on up.id=pu.user_group_id
+left join vehicle v on u.vehicle_id=v.id
+where 
+u.enabled='t' and u.type='delivery_associate' and v.name='Ebike' 
+and date(u.last_login) = date(now())
+and up.id in (139,141,108,140);
+
+select
+v.name as vehicle,u.name as rider_name,left(u.name,3) as hub_name
+from public.user u
+left join public.user_group_user pu on pu.user_id=u.id
+left join public.user_group up on up.id=pu.user_group_id
+left join vehicle v on u.vehicle_id=v.id
+where 
+u.enabled='t' and u.type='delivery_associate' and v.name='Motobike' 
+and date(u.last_login) = date(now())
+and up.id in (139,141,108,140);`)
+.then(res => {
+msg = "OPS SYSTEM BULLETIN:\n\n1. No of Ebike's Courier is active for Hub: " + res[0].rowCount + ' - http://10.194.108.216/reports/FLEET/Ebike.txt' +"\n2. No of Motobike's Courier is active for Hub: " + res[1].rowCount +  ' - http://10.194.108.216/reports/FLEET/Motobike.txt';
+    var csv = json2csv({data: res[0].rows, fields: ['vehicle','rider_name', 'hub_name'], quotes: ''});
+    fs.writeFile('C:/wamp64/www/reports/FLEET/Ebike.txt',csv, function (err){if(err) console.log(err);console.log('Fleet-Ebike file saved');});
+    
+    var csv2 = json2csv({data: res[1].rows, fields: ['vehicle','rider_name', 'hub_name'], quotes: ''});
+    fs.writeFile('C:/wamp64/www/reports/FLEET/Motobike.txt',csv2, function (err){if(err) console.log(err);console.log('Fleet-Motobike file saved');});
+robot.text(msg,at);
+//console.log(msg);
+})
+.catch(e=> console.error(e.stack))
+.then(()=> client.end());
